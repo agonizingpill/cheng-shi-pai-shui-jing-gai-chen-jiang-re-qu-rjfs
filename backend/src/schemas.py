@@ -34,3 +34,23 @@ class ResurveyIn(BaseModel):
     measured_at: datetime
     settlement_after_mm: float = Field(ge=0, le=200)
     notes: str = ""
+
+class NightWindowIn(BaseModel):
+    window_code: str = Field(min_length=3, max_length=60)
+    night_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    road_name: str = Field(min_length=2, max_length=120)
+    starts_at: datetime
+    ends_at: datetime
+    boundary: dict
+    quota: int = Field(ge=0, le=500)
+
+class QuotaIn(BaseModel):
+    quota: int = Field(ge=0, le=500)
+
+class NightPlanIn(BaseModel):
+    night_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+class NightConfirmIn(BaseModel):
+    night_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    idempotency_key: str = Field(min_length=8, max_length=80)
+    plan_ids: list[int] | None = None

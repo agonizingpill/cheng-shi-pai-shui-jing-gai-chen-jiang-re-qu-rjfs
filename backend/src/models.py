@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -125,4 +125,63 @@ class AuditLog(Base):
     entity_type = Column(String(80), nullable=False)
     entity_id = Column(String(80), nullable=True)
     detail = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+
+class NightWindow(Base):
+    __tablename__ = "night_windows"
+    id = Column(Integer, primary_key=True)
+    window_code = Column(String(60), unique=True, nullable=False)
+    night_date = Column(String(10), nullable=False)
+    road_name = Column(String(120), nullable=False)
+    starts_at = Column(DateTime(timezone=True), nullable=False)
+    ends_at = Column(DateTime(timezone=True), nullable=False)
+    boundary = Column(JSON, nullable=False, default=dict)
+    quota = Column(Integer, nullable=False, default=0)
+    status = Column(String(30), nullable=False, default="open")
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+class SchedulePlan(Base):
+    __tablename__ = "schedule_plans"
+    id = Column(Integer, primary_key=True)
+    plan_code = Column(String(60), unique=True, nullable=False)
+    night_date = Column(String(10), nullable=False)
+    kind = Column(String(20), nullable=False)
+    status = Column(String(30), nullable=False, default="pending")
+    return_reason = Column(Text, nullable=True)
+    idempotency_key = Column(String(80), nullable=True)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    assignments = relationship("ScheduleAssignment", back_populates="plan", cascade="all, delete-orphan")
+
+class ScheduleAssignment(Base):
+    __tablename__ = "schedule_assignments"
+    id = Column(Integer, primary_key=True)
+    plan_id = Column(Integer, ForeignKey("schedule_plans.id"), nullable=False)
+    window_id = Column(Integer, ForeignKey("night_windows.id"), nullable=False)
+    night_date = Column(String(10), nullable=False)
+    manhole_id = Column(Integer, ForeignKey("manhole_assets.id"), nullable=False)
+    point_id = Column(Integer, ForeignKey("survey_points.id"), nullable=True)
+    kind = Column(String(20), nullable=False)
+    cluster_label = Column(String(60), nullable=True)
+    settlement_mm = Column(Float, nullable=False)
+    status = Column(String(30), nullable=False, default="planned")
+    plan = relationship("SchedulePlan", back_populates="assignments")
+    __table_args__ = (
+        Index(
+            "uq_schedule_assignment_once_per_night",
+            "night_date", "manhole_id",
+            unique=True,
+            postgresql_where=text("status IN ('planned','confirmed')"),
+            sqlite_where=text("status IN ('planned','confirmed')"),
+        ),
+    )
+
+class ConfirmReceipt(Base):
+    __tablename__ = "confirm_receipts"
+    id = Column(Integer, primary_key=True)
+    idempotency_key = Column(String(80), unique=True, nullable=False)
+    night_date = Column(String(10), nullable=False)
+    actor_id = Column(Integer, nullable=True)
+    response = Column(JSON, nullable=False, default=dict)
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)

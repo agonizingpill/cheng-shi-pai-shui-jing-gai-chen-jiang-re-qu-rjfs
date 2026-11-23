@@ -17,3 +17,8 @@ export const acknowledgeNotice=id=>api(`/work-notices/${id}/acknowledge`,{method
 export const startRepair=id=>api(`/zones/${id}/start-repair`,{method:'POST'});
 export const submitResurvey=(id,payload)=>api(`/zones/${id}/resurvey`,{method:'POST',body:JSON.stringify(payload)});
 export const verifyResurvey=id=>api(`/resurveys/${id}/verify`,{method:'POST'});
+export const loadNightSchedule=night=>api(`/night-schedule?night=${night}`);
+export const createNightWindow=payload=>api('/night-windows',{method:'POST',body:JSON.stringify(payload)});
+export const setWindowQuota=(id,quota)=>api(`/night-windows/${id}/quota`,{method:'PUT',body:JSON.stringify({quota})});
+export const planNightSchedule=night=>api('/night-schedule/plan',{method:'POST',body:JSON.stringify({night_date:night})});
+export const confirmNightSchedule=(night,idempotencyKey)=>api('/night-schedule/confirm',{method:'POST',body:JSON.stringify({night_date:night,idempotency_key:idempotencyKey})});

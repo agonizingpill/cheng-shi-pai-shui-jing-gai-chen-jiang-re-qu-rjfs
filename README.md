@@ -16,6 +16,7 @@
 - 对同一坐标基准的测量点执行 DBSCAN，使用局部密度评分排序维修片区。
 - 发现施工边界冲突时阻止直接施工，主管按道路边界拆分片区并保留原始聚类证据。
 - 施工联动单提交、主管确认、维修启动、复测提交和主管核验销项。
+- 夜间封道窗口名额管理：按原密度门槛在窗口覆盖范围内找成片井盖优先生成排班，沉降超 8 mm 的散点单排，两批计划同时提交、任窗口名额不够则整批退回，幂等回执保证重试不重复占名额。
 - JWT 三角色权限、审计日志、请求限流、Redis 异步任务和 worker 心跳。
 
 ## 一天的工作剧本
@@ -68,8 +69,10 @@ worker 使用固定参数 `DBSCAN(eps=26m, min_samples=3)` 对同一测量批次
 ```text
 backend/src/models.py                 领域表与关联
 backend/src/services/cluster.py       DBSCAN 与局部密度评分
+backend/src/night_schedule.py         夜间封道窗口、排班批次与幂等确认
 backend/src/main.py                   认证、领域路由、状态规则
 backend/scripts/seed_demo.py           幂等演示数据
+backend/tests/test_night_schedule.py   夜间排班规则端到端测试
 frontend/src/app.js                   四个业务页面与交互
 frontend/src/api/client.js             API 封装
 frontend/src/styles.css                市政测绘图板视觉系统
@@ -101,3 +104,13 @@ Internal evaluation artifact.
 登录后打开「业务核验」，可以筛选和导出记录，主管可签认指定证据。
 
 - **道路封闭解除核对** 交叉核对封道许可、维修区状态、最后一次复测及许可截止。只有已完工并有主管验收的片区进入解封确认。
+
+## 夜间封道排班
+
+「热区复核」页下半区为夜间封道排班台，仅主管可设名额、生成排班并提交确认，所有角色可查看每口井盖的去向。
+
+- **窗口名额** 每个夜间封道窗口有覆盖范围（边界框）和井盖名额，seed 按当天日期生成南河路、西环路两个窗口，主管可改名额或新建窗口。
+- **密度门槛排班** `POST /api/night-schedule/plan` 在各窗口覆盖范围内复用 `DBSCAN(eps=26m, min_samples=3)` 找成片井盖生成「成片批」；噪声点中沉降超 8.0 mm 的生成「散点批」。同一井盖同晚只排一次，由部分唯一索引 `(night_date, manhole_id) WHERE status IN ('planned','confirmed')` 兜底。
+- **两批同时确认** `POST /api/night-schedule/confirm` 一次提交当晚全部待确认批次，成片批优先占名额。每批一个事务并锁定窗口行：任一窗口名额不够，该批整批退回待排（名额释放后可随下次提交再确认），另一批不受影响。
+- **幂等回执** 确认请求携带 `idempotency_key`，回执写入 `confirm_receipts`。确认回执丢失后用同一键重试，直接返回已存回执，不重复占名额。
+- **井盖去向** `GET /api/night-schedule?night=YYYY-MM-DD` 返回窗口用量、批次明细和每口井盖的排班去向（待确认 / 已确认 / 退回待排 / 未排班）。

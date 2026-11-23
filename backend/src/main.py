@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from redis import Redis
 
 from .operations_evidence import router as operations_evidence
+from .night_schedule import router as night_schedule
 from .database import Base, SessionLocal, engine, get_db
 from .models import AnalysisJob, AuditLog, ManholeAsset, RepairZone, Resurvey, SurveyBatch, SurveyPoint, User, WorkNotice
 from .schemas import BatchIn, LoginIn, NoticeIn, ResurveyIn, SurveyPointIn
@@ -21,6 +22,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("manhole-settlement")
 app = FastAPI(title="城市排水井盖沉降热区", version="1.0.0")
 app.include_router(operations_evidence)
+app.include_router(night_schedule)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(RequestAuditMiddleware)
 app.add_middleware(SimpleRateLimitMiddleware)
